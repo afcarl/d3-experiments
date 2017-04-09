@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>My Favorite Flowers</title>
+    <meta charset="utf-8">
+    <script src="http://d3js.org/d3.v3.min.js"></script>
+    <!--<script src="/js/d3.min.js"></script>-->
+  </head>
+  <body>
+    <div id)"content">
+      <h1>My Favorite Flowers</h1>
+    </div>
+    <script>
+
+    // Data
+    var flowers = [
+      {
+        "name": "Hydrangia",
+        "latin": "Hydrangea",
+        "light": "Sun",
+        "ease": 3
+      },
+      {
+        "name": "Chrysanethemum",
+        "latin": "Chrysanethemum",
+        "light": "Part Sun",
+        "ease": 1
+      },
+      {
+        "name": "Peony",
+        "latin": "Paeonia",
+        "light": "Part Sun",
+        "ease": -5
+      },
+      {
+        "name": "Orchid",
+        "latin": "Paeonia",
+        "light": "Shade",
+        "ease": -5
+      },
+      {
+        "name": "Fern",
+        "latin": "Dryopteris",
+        "light": "Shade",
+        "ease": -5
+      }
+    ];
+
+    // Part 1
+    // Crating elements
+    var div = d3.select("div#content")
+      .selectAll("div")
+      .data(flowers)
+      .enter().append("div").attr("class", "flower");
+
+
+
+    </script>
+  </body>
+</html>
