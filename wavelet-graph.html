@@ -9,10 +9,28 @@
   <body>
     <style>
 
-    </style>
+    .link {
+      fill: none;
+      stroke-width: 1.5px;
+      stroke-opacity: 0.3;
+    }
 
-    <svg width="800" height="360" id="filterbank"></svg>
-    <svg width="800" height="360" id="dilation"></svg>
+    .link-highlight {
+      fill: none;
+      stroke-width: 3px;
+      stroke-opacity: 1;
+    }
+
+    .node {
+      fill: lightSlateGray;
+      stroke: none;
+    }
+
+    .node-hover {
+      fill: black;
+    }
+
+    </style>
 
     <script>
 
@@ -82,114 +100,114 @@
     }
 
     // setup scales and layout
-    var svg_1 = d3.select("#filterbank");
-    var svg_2 = d3.select("#dilation");
+    var svg = d3.select("#filterbank");
 
-    [nodes_data_1, links_data_1] = create_data(max_level, num_coeff, filterbank_connection);
+    [nodes_data, links_data_1] = create_data(max_level, num_coeff, filterbank_connection);
     [nodes_data_2, links_data_2] = create_data(max_level, num_coeff, dilation_connection);
+    var data = [[nodes_data, links_data_1], [nodes_data_2, links_data_2]];
 
-    draw_graph(svg_1, nodes_data_1, links_data_1);
-    draw_graph(svg_2, nodes_data_2, links_data_2);
-
-    function draw_graph(svg, nodes_data, links_data) {
-      var margin = {top: 20, right: 20, bottom: 20, left: 20},
-          width = +svg.attr("width") - margin.left - margin.right,
-          height = +svg.attr("height") - margin.top - margin.bottom;
-
-      var color = d3.scaleOrdinal(d3.schemeCategory10),
-          x = d3.scaleLinear()
-                .range([width, margin.left])
-                .domain([0, d3.max(d3.values(nodes_data), function(d) { return d.position; })]);
-          y = d3.scaleLinear()
-                .range([height, margin.top])
-                .domain([0, d3.max(d3.values(nodes_data), function(d) { return d.level; })]);
-
-      function node_position(n) {
-        p = {"x": x(n.position), "y": y(n.level)};
-        return p
-      }
-
-      //create links
-      var links = svg.selectAll(".link")
-        .data(links_data)
-        .enter().append("path")
-          .attr("class", "link")
-          .attr("id", function(d) { return d.source +  d.target })
-          .attr("fill", "none")
-          .attr("stroke", function(d) { return color(d.value) })
-          .attr("stroke-width", "1.5px")
-          .attr("stroke-opacity", 0.3)
-          .attr("d", function(d) {
-            return link({
-              "source": node_position(nodes_data[d.source]),
-              "target": node_position(nodes_data[d.target])
-            })
-          });
-
-      // create nodes
-      var node = svg.selectAll(".node")
-        .data(d3.values(nodes_data))
-        .enter().append("g")
-          .attr("class", "node")
-          .attr("transform", function(d) {
-            p = node_position(d)
-            return "translate(" + p.x + "," + p.y + ")";
-          });
-
-      node.append("circle")
-          .attr("r", 6)
-          .attr("fill", "lightSlateGray")
-          .on("mouseover", function(d, i) {
-            d3.select(this)
-                .attr("fill", "black");
-            paths = find_paths(node_id(d), "n00", [], links_data);
-            draw_colors(paths.reverse());
-            paths = [].concat.apply([], paths);
-
-            paths.forEach(function(p) {
-              var this_link = d3.select("#" + p.source + p.target)
-                  .attr("stroke-width", "3.0px")
-                  .attr("stroke-opacity", 1.0);
-            });
-          })
-          .on("mouseout", function() {
-            d3.select(this)
-                .attr("fill", "lightSlateGray");
-            d3.selectAll(".link")
-                .attr("stroke-width", "1.5px")
-                .attr("stroke-opacity", 0.3);
-            d3.selectAll(".color_path").remove();
-          });
-
-      svg.append("g")
-          .attr("class", "axis axis--x")
-          .attr("transform", "translate(0," + (height + 20) + ")")
-          .call(d3.axisBottom(x));
-
-      var color_size = 15;
-      var color_margin_x = 8;
-      var color_margin_y = 1;
-
-      function draw_colors(paths) {
-        var color_paths = svg.selectAll(".color_path")
-          .data(paths)
-          .enter().append("g")
-            .attr("class", "color_path")
-            .attr("transform", function (d, i) {
-              return "translate(" + (margin.left + i * (color_size + color_margin_x)) + "," + (height) + ")"
-            })
-          .selectAll("rect")
-          .data(function(d) { return d.reverse()})
-          .enter().append("rect")
-            .attr("width", color_size)
-            .attr("height", color_size)
-            .attr("y", function(d, i) { return -(color_size + color_margin_y) * i})
-            .attr("fill", function(d) { return color(d.value) });
-      }
+    function node_position(n) {
+      p = {"x": x(n.position), "y": y(n.level)};
+      return p
     }
 
+    var margin = {top: 20, right: 20, bottom: 20, left: 20},
+        width = 800,
+        height = 360;
 
+    var color = d3.scaleOrdinal(d3.schemeCategory10),
+        x = d3.scaleLinear()
+              .range([width, margin.left])
+              .domain([0, d3.max(d3.values(nodes_data), function(d) { return d.position; })]);
+        y = d3.scaleLinear()
+              .range([height, margin.top])
+              .domain([0, d3.max(d3.values(nodes_data), function(d) { return d.level; })]);
 
+    var svg = d3.select("body").selectAll("svg")
+        .data(data)
+      .enter().append("svg")
+        .attr("width", width + margin.left + margin.right)
+        .attr("height", height + margin.top + margin.bottom);
+
+    //create links
+    var links = svg.selectAll(".link")
+      .data(function(d) { return d[1] })
+      .enter().append("path")
+        .attr("class", "link")
+        .attr("id", function(d) { return d.source +  d.target })
+        .attr("stroke", function(d) { return color(d.value) })
+        .attr("d", function(d) {
+          return link({
+            "source": node_position(nodes_data[d.source]),
+            "target": node_position(nodes_data[d.target])
+          })
+        });
+
+    // create nodes
+    var node = svg.selectAll(".node")
+      .data(function(d) { return d3.values(d[0]) })
+      .enter().append("g")
+        .attr("class", "node")
+        .attr("id", function(d) { return node_id(d) })
+        .attr("transform", function(d) {
+          p = node_position(d)
+          return "translate(" + p.x + "," + p.y + ")";
+        });
+
+    node.append("circle")
+        .attr("r", 6)
+        .on("mouseover", function(d, i) {
+          id = node_id(d);
+          n = d3.selectAll("#" + id);
+          n.each(function(d) {connect_node(this, id);})
+          //connect_node(n, id);
+        })
+        .on("mouseout", function() {
+          d3.select(this)
+              .attr("class", "node");
+          d3.selectAll(".link-highlight")
+              .attr("class", "link");
+          d3.selectAll(".color_path").remove();
+        });
+
+    svg.append("g")
+        .attr("class", "axis axis--x")
+        .attr("transform", "translate(0," + (height + 20) + ")")
+        .call(d3.axisBottom(x));
+
+    var color_size = 15;
+    var color_margin_x = 8;
+    var color_margin_y = 1;
+
+    function connect_node(node, node_id) {
+      d3.select(node)
+          .attr("class", "node-hover");
+      var this_svg = d3.select(node.parentNode);
+      paths = find_paths(node_id, "n00", [], this_svg.datum()[1]);
+
+      draw_colors(paths.reverse());
+      paths = [].concat.apply([], paths);
+      path_ids = paths.reduce(function(t, c) {return t + ", #" + c.source + c.target}, "#foo");
+      var selected_paths = this_svg.selectAll(path_ids)
+                                      .attr("class", "link-highlight");
+    }
+
+    function draw_colors(paths) {
+      var color_paths = svg.selectAll(".color_path")
+        .data(paths)
+        .enter().append("g")
+          .attr("class", "color_path")
+          .attr("transform", function (d, i) {
+            return "translate(" + (margin.left + i * (color_size + color_margin_x)) + "," + (height) + ")"
+          })
+        .selectAll("rect")
+        .data(function(d) { return d.reverse()})
+        .enter().append("rect")
+          .attr("width", color_size)
+          .attr("height", color_size)
+          .attr("y", function(d, i) { return -(color_size + color_margin_y) * i})
+          .attr("fill", function(d) { return color(d.value) });
+    }
 
 
     </script>
