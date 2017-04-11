@@ -9,15 +9,13 @@
   </head>
 
   <body>
-    <style>
-
-    </style>
 
     <svg width="600" height="400"></svg>
 
     <script>
 
-
+      var h_0 = db3.reverse();
+      var coeff = Array(10).fill(0).map(function(v, i) {return Math.pow((i-3.7), 2) - 5});
       var num_approx = 7;
       var data = scaling_approximation(h_0, num_approx);
       var offset = Math.pow(2, num_approx);
@@ -51,10 +49,6 @@
           .y1(function(d) { return y(d[1]);})
           .y0(function(d) { return y(d[0]);});
 
-      // var t = d3.transition()
-      //     .duration(1500)
-      //     .on("end", function() {res.transition().duration(3000).attr("opacity", "0.7");})
-
       var res = svg.selectAll(".result")
           .data(remaining_data)
         .enter().append("g")
@@ -63,6 +57,23 @@
           .attr("d", function(d) { return area_stacked(d); })
           .attr("fill", function(d) { return z_r(d)})
           .attr("opacity", "0.0");
+
+      // svg.selectAll(".component")
+      //     .data(Array(data.length).fill(data[0]))
+      //   .enter().append("g")
+      //     .attr("class", "component")
+      //   .append("path")
+      //     .attr("class", "area")
+      //     .attr("d", function(d) { return area(d); })
+      //     .attr("fill", function(d) { return z(d)})
+      //     .attr("opacity", "0.7");
+
+      svg.selectAll(".component")
+          .data(data)
+        .select("path")
+          .transition().duration(3000)
+          .attr("d", function(d) { return area(d); })
+          .attr("fill", function(d) { return z(d)})
 
       svg.selectAll(".component")
           .data(data)
@@ -82,21 +93,16 @@
           .duration(1500)
           .delay(function(d, i) { return 1500*i; })
           .on("end", function(d, i) {
-            if(i == h_0.length - 1) {
+            if(i == data.length - 1) {
               res.transition().duration(3000).attr("opacity", "1.");
               var stack = svg.selectAll(".component").select("path")
                   .transition().duration(3000)
+                  .on("end", function() { svg.selectAll(".component").remove(); })
                   .attr("opacity", "0.")
-                  .remove()
             }
           })
           .attr("d", function(d) { return area_stacked(d); })
           .attr("opacity", "0.7")
-
-
-
-
-
 
     </script>
   </body>
