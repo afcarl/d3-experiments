@@ -4,6 +4,8 @@
     <title>Wavelet Construction</title>
     <meta charset="utf-8">
     <script src="https://d3js.org/d3.v4.min.js"></script>
+    <script src="https://d3js.org/d3-scale-chromatic.v1.min.js"></script>
+    <script src="wavelets.js"></script>
   </head>
 
   <body>
@@ -11,76 +13,33 @@
 
     </style>
 
-    <svg width="960" height="500"></svg>
+    <svg width="600" height="400"></svg>
 
     <script>
-      var h_0 = [0.12940952255092145, -0.22414386804185735, -0.836516303737469, -0.48296291314469025];
 
-      function next_approximation(x_n, h_0) {
-        var new_value_count = 2*x_n.length + h_0.length - 2;
-        var new_x = Array(new_value_count).fill(0);
 
-        for (var j = 0; j < new_value_count; j++) {
-          var current_value = 0
-          for (var k = 0; k < h_0.length; k++) {
-            if ((j+k) % 2 == 0) {
-              var i = (j-k) / 2;
-              if(i >= 0 && i < x_n.length) {
-                current_value = current_value + h_0[k] * x_n[i];
-              }
-            }
-          }
-          new_x[j] = current_value;
-        }
-        return new_x;
-      }
-
-      function shift_and_scale(phi, scale_coeff, num_approx) {
-        var result = []
-        var offset = Math.pow(2, num_approx);
-        for (var i = 0; i < scale_coeff.length; i++) {
-          var scaled = phi.map(function(d) { return d * scale_coeff[i]; })
-          var start_buffer = Array(i*offset).fill(0);
-          var end_buffer = Array((scale_coeff.length - 1 - i)*offset).fill(0);
-          result.push(start_buffer.concat(scaled).concat(end_buffer));
-        }
-
-        return result;
-      }
-
-      function stack_data(data) {
-        var length = data[0].length;
-        var current_base = Array(length).fill(0);
-        var result = []
-        for (var i = 0; i < data.length; i++) {
-          var sum = data[i].map(function(v, j) { return v + current_base[j]; })
-          result[i] = sum.map(function(v, j) { return [current_base[j], v]; })
-          current_base = sum;
-        }
-        return result;
-      }
-
-      var data = [1];
-      var num_approx = 7
+      var num_approx = 7;
+      var data = scaling_approximation(h_0, num_approx);
       var offset = Math.pow(2, num_approx);
-      for (var i = 0; i < num_approx; i++) {
-        data = next_approximation(data, h_0);
-      }
-      data = shift_and_scale(data, h_0, num_approx);
+
+      data = shift_and_scale(data, coeff, num_approx);
       var flat_data = [].concat.apply([], data);
       var stacked_data = stack_data(data);
-      console.log(stacked_data);
+      var result = stacked_data[stacked_data.length-1].map(function(d) { return d[1]; })
+      var remaining_data = remaining_components(stacked_data, result);
+      console.log(remaining_data);
 
       var svg = d3.select("svg"),
           margin = {top: 20, right: 20, bottom: 30, left: 40},
           width = +svg.attr("width") - margin.left - margin.right,
           height = +svg.attr("height") - margin.top - margin.bottom;
 
-      var y = d3.scaleLinear().range([0, height]),
+      var y = d3.scaleLinear().range([height, 0]),
           x = d3.scaleLinear().range([0, width]);
       x.domain([0, data[0].length]);
       y.domain([d3.min(flat_data), d3.max(flat_data)]);
-      var z = d3.scaleOrdinal(d3.schemeCategory10);
+      var z = d3.scaleOrdinal(d3.schemeDark2);
+      var z_r = d3.scaleOrdinal(d3.schemeDark2);
 
       var area = d3.area()
           .x(function(d, i) { return x(i);})
@@ -92,27 +51,52 @@
           .y1(function(d) { return y(d[1]);})
           .y0(function(d) { return y(d[0]);});
 
-      var t = d3.transition()
-          .delay(1000)
-          .duration(3000);
+      // var t = d3.transition()
+      //     .duration(1500)
+      //     .on("end", function() {res.transition().duration(3000).attr("opacity", "0.7");})
 
-      var all_gs = svg.selectAll("g")
+      var res = svg.selectAll(".result")
+          .data(remaining_data)
+        .enter().append("g")
+          .attr("class", "result")
+        .append("path")
+          .attr("d", function(d) { return area_stacked(d); })
+          .attr("fill", function(d) { return z_r(d)})
+          .attr("opacity", "0.0");
+
+      svg.selectAll(".component")
           .data(data)
-          .enter().append("g");
-
-      svg.selectAll("g")
-          .append("path")
+        .enter().append("g")
+          .attr("class", "component")
+        .append("path")
           .attr("class", "area")
           .attr("d", function(d) { return area(d); })
           .attr("fill", function(d) { return z(d)})
           .attr("opacity", "0.7");
 
-      var all_gs = svg.selectAll("g")
+      svg.selectAll(".component")
           .data(stacked_data);
 
-      svg.selectAll("g").select("path").transition(t)
+      var stack = svg.selectAll(".component").select("path")
+        .transition()
+          .duration(1500)
+          .delay(function(d, i) { return 1500*i; })
+          .on("end", function(d, i) {
+            if(i == h_0.length - 1) {
+              res.transition().duration(3000).attr("opacity", "1.");
+              var stack = svg.selectAll(".component").select("path")
+                  .transition().duration(3000)
+                  .attr("opacity", "0.")
+                  .remove()
+            }
+          })
           .attr("d", function(d) { return area_stacked(d); })
-          .attr("opacity", "1.");
+          .attr("opacity", "0.7")
+
+
+
+
+
 
     </script>
   </body>
