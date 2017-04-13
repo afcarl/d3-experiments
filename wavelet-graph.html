@@ -4,7 +4,7 @@
     <title>Wavelet Dilation Graph</title>
     <meta charset="utf-8">
     <script src="https://d3js.org/d3.v4.min.js"></script>
-    <!--<script src="/js/d3.min.js"></script>-->
+    <script src="wavelets.js"></script>
   </head>
   <body>
     <style>
@@ -51,6 +51,8 @@
     var max_level = 4;
     var num_coeff = 4;
 
+
+
     function filterbank_connection(node, c) {
       var new_position = node.position + c / Math.pow(2, node.level+1);
       return new_position
@@ -61,6 +63,7 @@
     }
 
     function find_paths(source, target, path=[], links_data) {
+      //debugger;
       // find all links from the source
       next_links = links_data.filter(function(d) { return d.source == source });
       if(path.length == 0) {
@@ -111,7 +114,33 @@
               .range([height, margin.top])
               .domain([0, d3.max(d3.values(nodes_data), function(d) { return d.level; })]);
 
-    var svg = d3.select("body").selectAll("svg")
+    //calculated coefficients
+    var coefficients = [[{"level": 0, "value": 1}]];
+    for (var i = 0; i < max_level; i++) {
+      var c = next_approximation(coefficients[i].map(function(v) { return v.value; }), db2);
+      coefficients[i+1] = c.map(function(v) { return {"level": i+1, "value": v}; });
+    }
+    console.log(coefficients);
+    var last_coeff = coefficients[coefficients.length-1].map(function(v) { return v.value; });
+    var coeff_y = d3.scaleLinear().range([200, 0])
+      .domain([d3.min(last_coeff)*1.5, d3.max(last_coeff)*1.5]);
+
+    var coeff_svg = d3.select("body").append("svg")
+        .attr("width", width + margin.left + margin.right)
+        .attr("height", "200");
+
+    coeff_svg.selectAll("g")
+        .data(coefficients).enter()
+      .append("g")
+      .selectAll("circle")
+        .data(function(d) { return d;}).enter()
+      .append("circle")
+        .attr("r", "3")
+        .attr("id", function(d, i) { return "n" + d.level + i})
+        .attr("cx", function(d, i) { return x(i / Math.pow(2, d.level)); })
+        .attr("cy", function(d) { return coeff_y(d.value); })
+
+    var svg = d3.select("body").selectAll("foo")
         .data(data)
       .enter().append("svg")
         .attr("width", width + margin.left + margin.right)
@@ -150,7 +179,7 @@
         .attr("r", 6)
         .on("mouseover", function(d, i) {
           id = node_id(d);
-          n = d3.selectAll("#" + id);
+          n = svg.selectAll("#" + id);
           n.each(function(d) {connect_node(this, id);})
           //connect_node(n, id);
         })
