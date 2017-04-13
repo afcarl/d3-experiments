@@ -8,31 +8,19 @@
   </head>
   <body>
     <style>
-
-    .link {
-      fill: none;
-      stroke-width: 1.5px;
-      stroke-opacity: 0.3;
-    }
-
-    .link-highlight {
-      fill: none;
-      stroke-width: 3px;
-      stroke-opacity: 1;
-    }
-
-    .node {
-      fill: lightSlateGray;
-      stroke: none;
-    }
-
-    .node-hover {
-      fill: black;
-    }
-
     </style>
 
     <script>
+
+    var nodeColor = "lightSlateGray",
+        nodeColorH = "black",
+        linkStroke = "1.5px",
+        linkStrokeH = "3px",
+        linkOpacity = "0.3",
+        linkOpacityH = "1";
+
+    var removeDuration = 1000,
+        updateDuration = 250;
 
     function node_id(n) {
       return "n" + n.level + n.position * Math.pow(2, n.level)
@@ -136,6 +124,9 @@
         .attr("class", "link")
         .attr("id", function(d) { return d.source +  d.target })
         .attr("stroke", function(d) { return color(d.value) })
+        .attr("fill", "none")
+        .attr("stroke-opacity", linkOpacity)
+        .attr("stroke-width", linkStroke)
         .attr("d", function(d) {
           return link({
             "source": node_position(nodes_data[d.source]),
@@ -149,6 +140,7 @@
       .enter().append("g")
         .attr("class", "node")
         .attr("id", function(d) { return node_id(d) })
+        .attr("fill", nodeColor)
         .attr("transform", function(d) {
           p = node_position(d)
           return "translate(" + p.x + "," + p.y + ")";
@@ -164,10 +156,20 @@
         })
         .on("mouseout", function(d, i) {
           d3.selectAll(".node-hover")
-              .attr("class", "node");
+              .transition()
+              .attr("class", "node")
+              .attr("fill", nodeColor);
           d3.selectAll(".link-highlight")
-              .attr("class", "link");
-          d3.selectAll(".color_path").remove();
+              .transition()
+              .attr("class", "link")
+              .attr("stroke-width", linkStroke)
+              .attr("stroke-opacity", linkOpacity);
+          var color_paths = d3.selectAll(".color_path")
+          color_paths.selectAll("rect")
+              .transition().duration(removeDuration)
+              .attr("opacity", "0.0");
+          // color_paths.transition().duration(removeDuration)
+          //     .remove();
         });
 
     svg.append("g")
@@ -181,32 +183,58 @@
 
     function connect_node(node, node_id) {
       d3.select(node)
-          .attr("class", "node-hover");
+        .transition().duration(updateDuration)
+        .attr("class", "node-hover")
+        .attr("fill", nodeColorH);
       var this_svg = d3.select(node.parentNode);
       paths = find_paths(node_id, "n00", [], this_svg.datum()[1]);
 
       draw_colors(paths.reverse());
       paths = [].concat.apply([], paths);
       path_ids = paths.reduce(function(t, c) {return t + ", #" + c.source + c.target}, "#foo");
-      var selected_paths = this_svg.selectAll(path_ids)
-                                      .attr("class", "link-highlight");
+
+      this_svg.selectAll(path_ids)
+        .transition().duration(updateDuration)
+        .attr("class", "link-highlight")
+        .attr("stroke-width", linkStrokeH)
+        .attr("stroke-opacity", linkOpacityH);
     }
 
     function draw_colors(paths) {
+      paths = paths.map(function(v, i) { return {"path": v.reverse(), "index": i}; });
+
       var color_paths = svg.selectAll(".color_path")
         .data(paths)
-        .enter().append("g")
+
+      var color_elements = color_paths.enter() //enter
+        .append("g")
           .attr("class", "color_path")
-          .attr("transform", function (d, i) {
-            return "translate(" + (margin.left + i * (color_size + color_margin_x)) + "," + (height) + ")"
+          .attr("transform", function (d) {
+            return "translate(" + (margin.left + d.index * (color_size + color_margin_x)) + "," + (height) + ")"
           })
+        .merge(color_paths) //update
         .selectAll("rect")
-        .data(function(d) { return d.reverse()})
-        .enter().append("rect")
+          .data(function(d) { return d.path});
+
+      color_elements.enter() //enter
+        .append("rect")
           .attr("width", color_size)
           .attr("height", color_size)
           .attr("y", function(d, i) { return -(color_size + color_margin_y) * i})
+          .attr("fill", function(d) { return color(d.value) })
+          .attr("opacity", "0.0")
+        .merge(color_elements).transition().duration(updateDuration) //update
+          .attr("opacity", "1.0")
           .attr("fill", function(d) { return color(d.value) });
+
+      color_elements.exit()
+          .transition().duration(removeDuration)
+          .attr("opacity", "0.0")
+
+      color_paths.exit().selectAll("rect")
+          .transition().duration(removeDuration)
+          .attr("opacity", "0.0");
+
     }
 
 

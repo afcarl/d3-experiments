@@ -20,39 +20,55 @@
           height = +svg.attr("height") - margin.top - margin.bottom;
 
       var coefficients = []
+      var drawOptions = ["Scaling", "Wavelet"];
+      var drawFunctions = [function(v) { return v; }, calculate_h_1];
 
       d3.json("daubechies.json", function(error, daubechiesData) {
         var data = daubechiesData["Coefficients"];
         coefficients = data;
         console.log("data");
 
-        var select = d3.select("body")
-          .append("div")
-          .append("select")
-            .attr("class", "select")
-            .on("change", newCoefficients);
+        var optionsDiv = d3.select("body").append("div");
 
-        var options = select.selectAll("option")
-          .data(data)
+        var selectCoeff = optionsDiv.append("select")
+            .attr("class", "coeffSelect")
+            .attr("style", "margin-right:10px")
+            .on("change", newCoefficients)
+
+        selectCoeff.selectAll("option")
+            .data(data)
           .enter().append("option")
             .attr("value", function(d, i) {return i; })
             .text(function(d) { return d.name; });
 
-        select.property("value", "1");
+        optionsDiv.append("select")
+            .attr("class", "funcSelect")
+            .on("change", newCoefficients)
+          .selectAll("option")
+            .data(drawOptions)
+            .enter().append("option")
+              .attr("value", function(d, i) { return i; })
+              .text(function(d) { return d});
+
+        selectCoeff.property("value", "1");
         newCoefficients();
 
       });
 
       function newCoefficients() {
-        var coeff = coefficients[+d3.select(".select").property("value")].coefficients;
-        updateData(coeff);
+        svg.selectAll("*").transition();
+        svg.selectAll("*").remove();
+
+        var coeff = coefficients[+d3.select(".coeffSelect").property("value")].coefficients;
+        var drawFunc = drawFunctions[d3.select(".funcSelect").property("value")];
+        updateData(coeff, drawFunc);
       }
 
-      function updateData(new_coefficients) {
+      function updateData(new_coefficients, modeFunc) {
         var h_0 = new_coefficients;
         //var coeff = Array(10).fill(0).map(function(v, i) {return Math.pow((i-3.7), 2) - 9});
         //var coeff = Array(6).fill(0).map(function(v, i) {return i*0.3 - 0.8});
-        var coeff = h_0
+        var coeff = modeFunc(h_0);
         var num_approx = 7;
         var data = scaling_approximation(h_0, num_approx);
         data = shift_and_scale(data, coeff, num_approx);
@@ -77,9 +93,6 @@
             .x(function(d, i) { return x(i);})
             .y1(function(d) { return y(d[1]);})
             .y0(function(d) { return y(d[0]);});
-
-        svg.selectAll("*").transition();
-        svg.selectAll("*").remove();
 
         svg.selectAll(".component")
             .data(data)
