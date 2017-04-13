@@ -14,95 +14,108 @@
 
     <script>
 
-      var h_0 = db3.reverse();
-      var coeff = Array(10).fill(0).map(function(v, i) {return Math.pow((i-3.7), 2) - 5});
-      var num_approx = 7;
-      var data = scaling_approximation(h_0, num_approx);
-      var offset = Math.pow(2, num_approx);
-
-      data = shift_and_scale(data, coeff, num_approx);
-      var flat_data = [].concat.apply([], data);
-      var stacked_data = stack_data(data);
-      var result = stacked_data[stacked_data.length-1].map(function(d) { return d[1]; })
-      var remaining_data = remaining_components(stacked_data, result);
-      console.log(remaining_data);
-
       var svg = d3.select("svg"),
           margin = {top: 20, right: 20, bottom: 30, left: 40},
           width = +svg.attr("width") - margin.left - margin.right,
           height = +svg.attr("height") - margin.top - margin.bottom;
 
-      var y = d3.scaleLinear().range([height, 0]),
-          x = d3.scaleLinear().range([0, width]);
-      x.domain([0, data[0].length]);
-      y.domain([d3.min(flat_data), d3.max(flat_data)]);
-      var z = d3.scaleOrdinal(d3.schemeDark2);
-      var z_r = d3.scaleOrdinal(d3.schemeDark2);
+      var coefficients = []
 
-      var area = d3.area()
-          .x(function(d, i) { return x(i);})
-          .y1(function(d) { return y(d);})
-          .y0(y(0));
+      d3.json("daubechies.json", function(error, daubechiesData) {
+        var data = daubechiesData["Coefficients"];
+        coefficients = data;
+        console.log("data");
 
-      var area_stacked = d3.area()
-          .x(function(d, i) { return x(i);})
-          .y1(function(d) { return y(d[1]);})
-          .y0(function(d) { return y(d[0]);});
+        var select = d3.select("body")
+          .append("div")
+          .append("select")
+            .attr("class", "select")
+            .on("change", newCoefficients);
 
-      var res = svg.selectAll(".result")
-          .data(remaining_data)
-        .enter().append("g")
-          .attr("class", "result")
-        .append("path")
-          .attr("d", function(d) { return area_stacked(d); })
-          .attr("fill", function(d) { return z_r(d)})
-          .attr("opacity", "0.0");
-
-      // svg.selectAll(".component")
-      //     .data(Array(data.length).fill(data[0]))
-      //   .enter().append("g")
-      //     .attr("class", "component")
-      //   .append("path")
-      //     .attr("class", "area")
-      //     .attr("d", function(d) { return area(d); })
-      //     .attr("fill", function(d) { return z(d)})
-      //     .attr("opacity", "0.7");
-
-      svg.selectAll(".component")
+        var options = select.selectAll("option")
           .data(data)
-        .select("path")
-          .transition().duration(3000)
-          .attr("d", function(d) { return area(d); })
-          .attr("fill", function(d) { return z(d)})
+          .enter().append("option")
+            .attr("value", function(d, i) {return i; })
+            .text(function(d) { return d.name; });
 
-      svg.selectAll(".component")
-          .data(data)
-        .enter().append("g")
-          .attr("class", "component")
-        .append("path")
-          .attr("class", "area")
-          .attr("d", function(d) { return area(d); })
-          .attr("fill", function(d) { return z(d)})
-          .attr("opacity", "0.7");
+        select.property("value", "1");
+        newCoefficients();
 
-      svg.selectAll(".component")
-          .data(stacked_data);
+      });
 
-      var stack = svg.selectAll(".component").select("path")
-        .transition()
-          .duration(1500)
-          .delay(function(d, i) { return 1500*i; })
-          .on("end", function(d, i) {
-            if(i == data.length - 1) {
-              res.transition().duration(3000).attr("opacity", "1.");
-              var stack = svg.selectAll(".component").select("path")
-                  .transition().duration(3000)
-                  .on("end", function() { svg.selectAll(".component").remove(); })
-                  .attr("opacity", "0.")
-            }
-          })
-          .attr("d", function(d) { return area_stacked(d); })
-          .attr("opacity", "0.7")
+      function newCoefficients() {
+        var coeff = coefficients[+d3.select(".select").property("value")].coefficients;
+        updateData(coeff);
+      }
+
+      function updateData(new_coefficients) {
+        var h_0 = new_coefficients;
+        //var coeff = Array(10).fill(0).map(function(v, i) {return Math.pow((i-3.7), 2) - 9});
+        //var coeff = Array(6).fill(0).map(function(v, i) {return i*0.3 - 0.8});
+        var coeff = h_0
+        var num_approx = 7;
+        var data = scaling_approximation(h_0, num_approx);
+        data = shift_and_scale(data, coeff, num_approx);
+        var stacked_data = stack_data(data);
+        var result = stacked_data[stacked_data.length-1].map(function(d) { return d[1]; });
+        var flat_data = [].concat.apply([], data).concat(result);
+        var remaining_data = remaining_components(stacked_data, result);
+
+        var y = d3.scaleLinear().range([height, 0]),
+            x = d3.scaleLinear().range([0, width]);
+        x.domain([0, data[0].length]);
+        y.domain([d3.min(flat_data), d3.max(flat_data)]);
+        var z = d3.scaleOrdinal(d3.schemeDark2);
+        var z_r = d3.scaleOrdinal(d3.schemeDark2);
+
+        var area = d3.area()
+            .x(function(d, i) { return x(i);})
+            .y1(function(d) { return y(d);})
+            .y0(y(0));
+
+        var area_stacked = d3.area()
+            .x(function(d, i) { return x(i);})
+            .y1(function(d) { return y(d[1]);})
+            .y0(function(d) { return y(d[0]);});
+
+        svg.selectAll("*").transition();
+        svg.selectAll("*").remove();
+
+        svg.selectAll(".component")
+            .data(data)
+          .enter().append("g")
+            .attr("class", "component")
+          .append("path")
+            .attr("class", "area")
+            .attr("d", function(d) { return area(d); })
+            .attr("fill", function(d) { return z(d)})
+            .attr("opacity", "0.7");
+
+        svg.selectAll(".component")
+            .data(stacked_data)
+          .select("path")
+            .transition()
+            .duration(1500)
+            .delay(function(d, i) { return 1500*i; })
+            .on("end", function(d, i) {
+              svg.append("g")
+                  .data([remaining_data[i]])
+                  .attr("class", "result")
+                .append("path")
+                  .attr("d", function(d) { return area_stacked(d); })
+                  .attr("fill", function(d) { return z_r(d)})
+                  .attr("opacity", "0.0")
+                  .transition().delay(1500).duration(1500)
+                  .attr("opacity", "1.0");
+
+              if(i == data.length - 1) {
+                svg.selectAll(".component").select("path")
+                    .transition().delay(1500).duration(3000)
+                    .attr("opacity", "0.")
+              }
+            })
+            .attr("d", function(d) { return area_stacked(d); })
+      }
 
     </script>
   </body>
