@@ -11,16 +11,65 @@
     </style>
 
     <script>
+    console.log("start");
+    // debugger;
 
-    var nodeColor = "lightSlateGray",
+    var coefficients = []
+    var levelsOptions = ["2 levels", "3 levels", "4 levels", "5 levels", "6 levels"];
+
+    d3.json("daubechies.json", function(error, daubechiesData) {
+      // console.log("json");
+      // debugger;
+      var data = daubechiesData["Coefficients"];
+      coefficients = data;
+
+      var levelsDiv = d3.select("body").append("div");
+
+      var selectCoeff = levelsDiv.append("select")
+          .attr("class", "coeffSelect")
+          .attr("style", "margin-right:10px")
+          .on("change", newCoefficients)
+
+      selectCoeff.selectAll("option")
+          .data(data)
+        .enter().append("option")
+          .attr("value", function(d, i) {return i; })
+          .text(function(d) { return d.name; });
+
+      var selectLevels = levelsDiv.append("select")
+          .attr("class", "levelsSelect")
+          .on("change", newCoefficients);
+
+      selectLevels.selectAll("option")
+          .data(levelsOptions)
+          .enter().append("option")
+            .attr("value", function(d, i) { return i; })
+            .text(function(d) { return d});
+
+      selectCoeff.property("value", "1");
+      selectLevels.property("value", "2");
+      newCoefficients();
+
+    });
+
+    var nodeRadius = "5px",
+        nodeColor = "lightSlateGray",
         nodeColorH = "black",
         linkStroke = "1.5px",
         linkStrokeH = "3px",
         linkOpacity = "0.3",
         linkOpacityH = "1";
 
+    var color_size = 15,
+        color_margin_x = 8,
+        color_margin_y = 1;
+
     var removeDuration = 1000,
         updateDuration = 250;
+
+    var margin = {top: 20, right: 20, bottom: 20, left: 20},
+        width = 540,
+        height = 200;
 
     function node_id(n) {
       return "n" + n.level + n.position * Math.pow(2, n.level)
@@ -53,9 +102,6 @@
       return [nodes, links]
     }
 
-    var max_level = 4;
-    var num_coeff = 4;
-
     function filterbank_connection(node, c) {
       var new_position = node.position + c / Math.pow(2, node.level+1);
       return new_position
@@ -66,7 +112,6 @@
     }
 
     function find_paths(source, target, path=[], links_data) {
-      //debugger;
       // find all links from the source
       next_links = links_data.filter(function(d) { return d.source == source });
       if(path.length == 0) {
@@ -93,147 +138,171 @@
           + " " + d.target.x + "," + d.target.y;
     }
 
-    // setup scales and layout
-    var svg = d3.select("#filterbank");
+    var max_level = 4;
+    var num_coeff = 4;
 
-    [nodes_data, links_data_1] = create_data(max_level, num_coeff, filterbank_connection);
-    [nodes_data_2, links_data_2] = create_data(max_level, num_coeff, dilation_connection);
-    var data = [[nodes_data, links_data_1], [nodes_data_2, links_data_2]];
+    var color = d3.scaleOrdinal(d3.schemeCategory10);
 
-    function node_position(n) {
-      p = {"x": x(n.position), "y": y(n.level)};
-      return p
+    function newCoefficients() {
+      d3.selectAll("*").transition();
+      d3.selectAll(".graph").remove();
+
+      var h_0 = coefficients[+d3.select(".coeffSelect").property("value")].coefficients;
+      var num_levels = +d3.select(".levelsSelect").property("value") + 1;
+      drawGraph(h_0, num_levels);
     }
 
-    var margin = {top: 20, right: 20, bottom: 20, left: 20},
-        width = 540,
-        height = 200;
+    function drawGraph(h_0, max_level) {
+      //debugger;
+      var num_coeff = h_0.length;
+      [nodes_data, links_data_1] = create_data(max_level, num_coeff, filterbank_connection);
+      [nodes_data_2, links_data_2] = create_data(max_level, num_coeff, dilation_connection);
+      var data = [[nodes_data, links_data_1], [nodes_data_2, links_data_2]];
 
-    var color = d3.scaleOrdinal(d3.schemeCategory10),
-        x = d3.scaleLinear()
-              .range([width, margin.left])
-              .domain([0, d3.max(d3.values(nodes_data), function(d) { return d.position; })]);
-        y = d3.scaleLinear()
-              .range([height, margin.top])
-              .domain([0, d3.max(d3.values(nodes_data), function(d) { return d.level; })]);
+      function node_position(n) {
+        p = {"x": x(n.position), "y": y(n.level)};
+        return p
+      }
 
-
-
-    //calculated coefficients
-    var coeff_margin = 20;
-    var coefficients = [[{"level": 0, "value": 1}]];
-    for (var i = 0; i < max_level; i++) {
-      var c = next_approximation(coefficients[i].map(function(v) { return v.value; }), db2);
-      coefficients[i+1] = c.map(function(v) { return {"level": i+1, "value": v}; });
-    }
-    console.log(coefficients);
-    var coeff_y = d3.scaleLinear().range([200-coeff_margin, 0+coeff_margin])
-      .domain(flat_range(coefficients, function(v) { return v.value; }));
-
-    var line = d3.line()
-        .x(function(d, i) { return x(i / Math.pow(2, d.level)); })
-        .y(function(d) { return coeff_y(d.value); });
-
-    var coeff_svg = d3.select("body").append("svg")
-        .attr("width", width + margin.left + margin.right)
-        .attr("height", "200");
-
-    coeff_svg.selectAll("g")
-        .data(coefficients).enter()
-      .append("g")
-      .selectAll("circle")
-        .data(function(d) { return d;}).enter()
-      .append("circle")
-        .attr("r", "0px")
-        .attr("id", function(d, i) { return "n" + d.level + i})
-        .attr("cx", function(d, i) { return x(i / Math.pow(2, d.level)); })
-        .attr("cy", function(d) { return coeff_y(d.value); })
-
-    coeff_svg.selectAll("g")
-      .append("path")
-        .attr("fill", "none")
-        .attr("stroke", "black")
-        .attr("d", line);
+      var x = d3.scaleLinear()
+                .range([width, margin.left])
+                .domain([0, d3.max(d3.values(nodes_data), function(d) { return d.position; })]),
+          y = d3.scaleLinear()
+                .range([height, margin.top])
+                .domain([0, d3.max(d3.values(nodes_data), function(d) { return d.level; })]);
 
 
+      //calculated coefficients
+      var h_0 = h_0.map(function(v) { return v*Math.pow(2, 0.5)});
+      var coeff_height = 200;
+      //calculate coefficients
+      var coefficients = [[{"level": 0, "value": 1}]];
+      for (var i = 0; i < max_level; i++) {
+        var c = next_approximation(coefficients[i].map(function(v) { return v.value; }), h_0);
+        coefficients[i+1] = c.map(function(v) { return {"level": i+1, "value": v}; });
+      }
 
-    var svg = d3.select("body").selectAll("foo")
-        .data(data)
-      .enter().append("svg")
-        .attr("width", width + margin.left + margin.right)
-        .attr("height", height + margin.top + margin.bottom);
+      var coeff_y = d3.scaleLinear().range([coeff_height, margin.top])
+          .domain(flat_range(coefficients, function(v) { return v.value; }));
 
-    //create links
-    var links = svg.selectAll(".link")
-      .data(function(d) { return d[1] })
-      .enter().append("path")
-        .attr("class", "link")
-        .attr("id", function(d) { return d.source +  d.target })
-        .attr("stroke", function(d) { return color(d.value) })
-        .attr("fill", "none")
-        .attr("stroke-opacity", linkOpacity)
-        .attr("stroke-width", linkStroke)
-        .attr("d", function(d) {
-          return link({
-            "source": node_position(nodes_data[d.source]),
-            "target": node_position(nodes_data[d.target])
+      var line = d3.line()
+          .x(function(d, i) { return x(i / Math.pow(2, d.level)); })
+          .y(function(d) { return coeff_y(d.value); });
+
+      var coeff_svg = d3.select("body").append("svg")
+          .attr("class", "graph")
+          .attr("width", width + margin.left + margin.right)
+          .attr("height", coeff_height + margin.top + margin.bottom);
+
+      coeff_svg.selectAll("g")
+          .data(coefficients).enter()
+        .append("g")
+        .selectAll("circle")
+          .data(function(d) { return d;}).enter()
+        .append("circle")
+          .attr("r", "0px")
+          .attr("id", function(d, i) { return "n" + d.level + i})
+          .attr("cx", function(d, i) { return x(i / Math.pow(2, d.level)); })
+          .attr("cy", function(d) { return coeff_y(d.value); })
+
+      coeff_svg.selectAll("g")
+        .append("path")
+          .attr("id", function(d, i) { return "l" + i; })
+          .attr("fill", "none")
+          .attr("stroke", "black")
+          .attr("stroke-width", "1.5px")
+          .attr("stroke-opacity", "0.3")
+          .attr("d", line);
+
+      coeff_svg.append("g")
+          .attr("class", "axis axis--x")
+          .attr("transform", "translate(0," + (coeff_height + 20) + ")")
+          .call(d3.axisBottom(x));
+
+      coeff_svg.append("g")
+          .attr("class", "axis axis--y")
+          .attr("transform", "translate(" + (width + 10) + ", 0)")
+          .call(d3.axisRight(coeff_y));
+
+
+
+      var svg = d3.select("body").selectAll("foo")
+          .data(data)
+        .enter().append("svg")
+          .attr("class", "graph")
+          .attr("width", width + margin.left + margin.right)
+          .attr("height", height + margin.top + margin.bottom);
+
+      //create links
+      var links = svg.selectAll(".link")
+        .data(function(d) { return d[1] })
+        .enter().append("path")
+          .attr("class", "link")
+          .attr("id", function(d) { return d.source +  d.target })
+          .attr("stroke", function(d) { return color(d.value) })
+          .attr("fill", "none")
+          .attr("stroke-opacity", linkOpacity)
+          .attr("stroke-width", linkStroke)
+          .attr("d", function(d) {
+            return link({
+              "source": node_position(nodes_data[d.source]),
+              "target": node_position(nodes_data[d.target])
+            })
+          });
+
+      // create nodes
+      var node = svg.selectAll(".node")
+        .data(function(d) { return d3.values(d[0]) })
+        .enter().append("g")
+          .attr("class", "node")
+          .attr("id", function(d) { return node_id(d) })
+          .attr("fill", nodeColor)
+          .attr("transform", function(d) {
+            p = node_position(d)
+            return "translate(" + p.x + "," + p.y + ")";
+          });
+
+      node.append("circle")
+          .attr("r", nodeRadius)
+          .on("mouseover", function(d, i) {
+            id = node_id(d);
+            n = svg.selectAll("#" + id);
+            n.each(function(d) {connect_node(this, id);})
+
+            coeff_svg.selectAll("#" + id)
+              .transition().duration(updateDuration)
+              .attr("r", nodeRadius);
+            coeff_svg.selectAll("#l" + d.level)
+              .transition().duration(updateDuration)
+              .attr("stroke-opacity", "1.0");
           })
-        });
+          .on("mouseout", function(d, i) {
+            d3.selectAll(".node-hover")
+                .transition().duration(removeDuration)
+                .attr("class", "node")
+                .attr("fill", nodeColor);
+            d3.selectAll(".link-highlight")
+                .transition().duration(removeDuration)
+                .attr("class", "link")
+                .attr("stroke-width", linkStroke)
+                .attr("stroke-opacity", linkOpacity);
 
-    // create nodes
-    var node = svg.selectAll(".node")
-      .data(function(d) { return d3.values(d[0]) })
-      .enter().append("g")
-        .attr("class", "node")
-        .attr("id", function(d) { return node_id(d) })
-        .attr("fill", nodeColor)
-        .attr("transform", function(d) {
-          p = node_position(d)
-          return "translate(" + p.x + "," + p.y + ")";
-        });
+            var color_paths = d3.selectAll(".color_path")
+            color_paths.selectAll("rect")
+                .transition().duration(removeDuration)
+                .attr("opacity", "0.0");
 
-    node.append("circle")
-        .attr("r", 6)
-        .on("mouseover", function(d, i) {
-          id = node_id(d);
-          n = svg.selectAll("#" + id);
-          n.each(function(d) {connect_node(this, id);})
-
-          coeff_svg.selectAll("#" + id)
-            .transition(removeDuration)
-            .attr("r", "5px");
-          //connect_node(n, id);
-        })
-        .on("mouseout", function(d, i) {
-          d3.selectAll(".node-hover")
-              .transition()
-              .attr("class", "node")
-              .attr("fill", nodeColor);
-          d3.selectAll(".link-highlight")
-              .transition()
-              .attr("class", "link")
-              .attr("stroke-width", linkStroke)
-              .attr("stroke-opacity", linkOpacity);
-          var color_paths = d3.selectAll(".color_path")
-          color_paths.selectAll("rect")
+            coeff_svg.selectAll("#" + node_id(d))
               .transition().duration(removeDuration)
-              .attr("opacity", "0.0");
+              .attr("r", "0px");
+            coeff_svg.selectAll("#l" + d.level)
+              .transition().duration(removeDuration)
+              .attr("stroke-opacity", "0.3");
+          });
 
-          coeff_svg.selectAll("#" + node_id(d))
-            .transition(removeDuration)
-            .attr("r", "0px");
-          // color_paths.transition().duration(removeDuration)
-          //     .remove();
-        });
+    };
 
-    svg.append("g")
-        .attr("class", "axis axis--x")
-        .attr("transform", "translate(0," + (height + 20) + ")")
-        .call(d3.axisBottom(x));
 
-    var color_size = 15;
-    var color_margin_x = 8;
-    var color_margin_y = 1;
 
     function connect_node(node, node_id) {
       d3.select(node)
@@ -243,7 +312,7 @@
       var this_svg = d3.select(node.parentNode);
       paths = find_paths(node_id, "n00", [], this_svg.datum()[1]);
 
-      draw_colors(paths.reverse());
+      draw_colors(paths.reverse(), this_svg);
       paths = [].concat.apply([], paths);
       path_ids = paths.reduce(function(t, c) {return t + ", #" + c.source + c.target}, "#foo");
 
@@ -254,10 +323,10 @@
         .attr("stroke-opacity", linkOpacityH);
     }
 
-    function draw_colors(paths) {
+    function draw_colors(paths, this_svg) {
       paths = paths.map(function(v, i) { return {"path": v.reverse(), "index": i}; });
 
-      var color_paths = svg.selectAll(".color_path")
+      var color_paths = this_svg.selectAll(".color_path")
         .data(paths)
 
       var color_elements = color_paths.enter() //enter
